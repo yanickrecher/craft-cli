@@ -1,0 +1,509 @@
+#!/bin/bash
+
+
+
+# DEFAULTS
+# =========================================================================
+
+help=""
+
+sitename="New Homepage"
+setup_name="setup-siteconfig"
+project_name_replace="_PROJEKT_NAME_"
+ip_replace="_IP_ADDRESS_"
+version_replace="_VERSION_"
+version="1.0.0"
+base_ip="192.168."
+setup_plugins_install=""
+
+date=$(date +"%Y-%m-%d")
+hash_in=${base_ip}${date}${secret_key}
+ip_hash=($(echo -n $hash_in | shasum -a 256))
+# ip_url="http://${ip_uri}?key=${ip_hash}&ip=${base_ip}&no_json=1"
+
+
+# sed escaping function
+# =========================================================================
+
+function sedescape {
+  sed -i '' "s/$(echo $1 | sed -e 's/\([[\/.*]\|\]\)/\\&/g')/$(echo $2 | sed -e 's/[\/&]/\\&/g')/g" $3
+}
+
+
+# get options/arguments
+while getopts p:h: option
+do
+    case "${option}"
+    in
+        h) help="help";;
+        c) currentpath_arg=${OPTARG};;
+    esac
+done
+
+cat << EOF
+
+=========================================================================
+Create .siteconfig.yaml
+=========================================================================
+
+EOF
+
+# display help
+
+if [[ "${help}" == "help" ]]; then
+cat << EOF
+
+-------------------------------------------------------------------------
+HELP
+-------------------------------------------------------------------------
+
+Holt sich die Siteconfig momentan noch aus dem Gitlab Reop.
+Später soll dieses eine File auch direkt über Bash Befehle erstellt werden.
+
+    -c [true] Wird aus dem Name des aktuellen ordner
+    In welchem man sich gerade befindet eine .siteconfig Datei erstellt.
+
+-------------------------------------------------------------------------
+
+EOF
+exit
+fi
+
+# Read Project Name from stdin
+cat << EOF
+
+Angaben für File «.siteconfig.yaml»
+
+EOF
+
+# Daten einlesen
+# -----------------------------------------------------------------------------
+
+# Projektname
+
+if [ -z "${currentpath_arg}" ]; then
+
+    read -p "Projektname (Normaler Case) : " project_name
+    if [ -z "$project_name" ]; then
+        echo "Kann ohne Projektnamen nicht weiter machen. Abbruch"; echo
+        exit
+    fi
+else
+
+    if [ "${currentpath_arg}" == "true" ]; then
+
+cat << EOF
+
+    Du bist dabei im aktuellen ordner ein Projektdatei .siteconfig.yaml
+    anzulegen.
+
+EOF
+        read -p "Ist folgender Projektname gut, sonst schreib ein eigenen [${PWD##*/}]: " project_name_new_current
+
+        if ! [ -z "${project_name_new_current}" ]; then
+            project_name="${project_name_new_current}"
+        else
+            echo"Es wird ${PWD##*/} als projektname genommen"
+            project_name="${PWD##*/}"
+        fi
+
+    fi
+
+fi
+sitename="${project_name}";
+project_name="$(string-to-case -c gitlab -s "$project_name")"
+
+# Verzeichnis anlegen, wenn nicht schon drin
+current_dir=${PWD##*/}
+
+if [ -d ${project_name} ]; then
+echo "Das Verzeichnis ${project_name} existiert bereits und kann nicht nochmals erstellt werden. Abbruch!!!";
+exit
+fi
+
+
+
+# CMS
+echo
+echo "Wähle ein CMS/Framework/Entwicklungsoberfläche."
+read -p "[craft2] | [craft3] | [symfony] | [prototype] leer lassen für keins: " cms
+
+if [ "$cms" == "" ] || [ "$cms" == "craft2" ] || [ "$cms" == "prototype" ]; then
+
+    public_folder="public";
+
+fi
+
+if [ "$cms" == "symfony" ] || [ "$cms" == "craft3" ] ; then
+
+    public_folder="web";
+
+fi
+
+if [ "$cms" == "prototype" ]; then
+
+    echo "Welche Art Prototype möchtest du erstellen:"
+    read -p "[html] | [twig] | [styleguide] (styleguide wird als html erstellt mit Beispiel index.html): " prototype
+
+    if [ "$prototype" == "" ]; then
+
+        echo "Es muss ein Prototype Art definiert werden!!! Abbruch..."
+        exit;
+
+    fi
+
+    if [ "$prototype" == "html" ] || [ "$prototype" == "twig" ] || [ "$prototype" == "styleguide" ]; then
+
+        echo "[$prototype] gewählt."
+
+    else
+
+        echo "Ungültige Prototype auswahl $prototype. Abbruch!!!"
+        exit;
+
+    fi
+fi
+
+
+# Frontend Umgebung
+echo
+echo "Nun kannst du entscheiden nach welcher Frontend Struktur du arbeiten möchtest."
+read -p " ITCSS | leer lassen für keins(in diesem Fall wird nur die main.scss Datei angelegt): " frontend_struct
+
+
+valid_scss_structur_choosen="";
+
+if [ "$frontend_struct" == "" ]; then
+    valid_scss_structur_choosen="1";
+fi
+
+if [ "$frontend_struct" == "ITCSS" ] || [ "$frontend_struct" == "itcss" ]; then
+    frontend_struct="ITCSS";
+    valid_scss_structur_choosen="1";
+fi
+
+if [ -z "$valid_scss_structur_choosen" ]; then
+    echo"Kein Valide Frontend Structur gewählt. Abbruch!!!";
+    exit;
+fi
+
+
+echo
+echo "Wie soll dein public Pfad heissen, in welchem später deine index datei und dein Assets ordner drinn sein wird?"
+read -p "Dies kann z.B. public|web sein, Default ist -> [$public_folder]: " public_folder_new
+
+if ! [ -z "$public_folder_new" ]; then
+    public_folder="$public_folder_new";
+fi
+
+echo
+echo "in welchem Pfad möchtest du deine Frontend Dateien (Arbeits Ordner) wie SCSS und JS-Dateien ablegen?"
+read -p "z.B. src|dev als standard wird folgendes genommen: [src]" frontend_dev_folder
+
+if [ -z "$frontend_dev_folder" ]; then
+    frontend_dev_folder="src";
+fi
+
+if [ "$cms" == "craft" ] || [ "$cms" == "CRAFT" ] || [ "$cms" == "craft2" ] || [ "$cms" == "craft3" ]; then
+    echo
+    read -p "Standardplugins installieren von $cms installieren j|n [j]?" setup_plugins_install
+    echo
+    if [ "$setup_plugins_install" == 'j' ] || [ -z "$setup_plugins_install" ]; then
+        setup_plugins_install="j"
+        echo "Die standard Plugins werden am ende installiert.";
+    else
+        setup_plugins_install="n"
+    fi
+fi
+
+echo
+echo "Version ist $version"
+echo
+read -p "Version ändern? j|n : " enter_version
+if [ "$enter_version" == 'j' ]; then
+    echo
+    read -p "neue Version: " new_version
+    if [ ! -z $new_version ]; then
+        version=$new_version
+    fi
+fi
+
+echo
+read -p "möchtest du Vagrant installieren? [j]" vagrant_install
+
+if [ "$vagrant_install" == "" ]; then
+    vagrant_install="j";
+fi
+
+if [ "$vagrant_install" == "j" ] || [ "$vagrant_install" == "J" ] || [ "$vagrant_install" == "y" ] || [ "$vagrant_install" == "Y" ]; then
+    vagrant_install="j";
+cat << EOF
+
+    Brauchst Du eine neue Vagrant IP Adresse?
+        [j] ja (default)
+        [n] nein
+        [s] selber eingeben
+
+EOF
+
+    read -p "j|n|s [j]: " enter_ip_address
+
+    echo
+
+    if [ -z "$enter_ip_address" ] || [ "$enter_ip_address" == 'j' ] || [ "$enter_ip_address" == 'y' ]; then
+        # get new IP Address
+        # new_ip=$(curl -s $ip_url)
+        echo "Ip-Adresse muss selber eingegeben werden."
+        read -p "Vagrant IP Adresse: " new_ip
+
+    elif [ "$enter_ip_address" == 's' ]; then
+        # user enters IP Address
+        read -p "Vagrant IP Adresse: " new_ip
+    else
+        # empty IP Address
+        new_ip=""
+    fi
+
+fi
+
+# Local-Server/Vagrant Angaben
+
+cat << EOF
+
+Hast du Angaben zur Lokalen Datenbank?
+    [j] ja
+    [v] vagrant-Default-values
+    [n] nein
+
+EOF
+
+read -p "[j|v|n]: " enter_local_data
+
+if ! [ -z "$enter_local_data" ] || ! [ "$enter_local_data" == "n" ]; then
+
+    if [ "$enter_local_data" == "v" ]; then
+
+        # Vagrant Default Values
+        local_db_host="192.168.10.1"
+        local_db_name="$(string-to-case -c db -s "$project_name")"
+        local_db_user="root"
+        local_db_pwd="secret"
+cat << EOF
+
+    Vagrant Standard Daten wurden gesetzt:
+    local_db_host=${local_db_host}
+    local_db_name=${local_db_name}
+    local_db_user=${local_db_user}
+    local_db_pwd =${local_db_pwd}
+EOF
+
+    fi
+
+    if [ "$enter_local_data" == "j" ] || [ "$enter_local_data" == "y" ]; then
+
+        read -p "Lokaler DB Hostname? " local_db_host
+
+        read -p "Lokaler DB Name? " local_db_name
+
+        read -p "Lokaler DB User? " local_db_user
+
+        read -p "Lokaler DB Passwort? " local_db_pwd
+
+
+    fi
+
+fi
+
+# Stage-Server Angaben
+
+cat << EOF
+
+Hast Du Angaben zum Stage-Server (Domain, Pfad, Datenbank) bereit?
+    [j] ja
+    [n] nein
+
+EOF
+
+read -p "[j|n]: " enter_stage_data
+
+if [ "$enter_stage_data" == 'j' ] || [ "$enter_stage_data" == 'y' ]; then
+    echo
+    echo "Stage-Server Angaben"
+    echo "-------------------------------------------------------------------------"
+    echo
+
+    read -p "Domain [stage."${project_name}".ch]: " stage_domain
+    if [ -z "${stage_domain}" ]; then stage_domain="stage."${project_name}".ch"; fi
+
+    stage_path="~/www/${stage_domain}/${public_folder}/"
+
+    echo
+    echo "Meine Vorgabe für den Pfad:"
+    echo $stage_path
+    echo
+
+    read -p "Pfad ändern? [j|n] : " change_stage_path
+    if [ "$change_stage_path" == 'j' ] || [ "$change_stage_path" == 'y' ]; then
+        read -p "Neuer Pfad: " new_stage_path
+        if [ ! -z $new_stage_path ]; then
+            stage_path=$new_stage_path;
+        fi
+    fi
+
+    read -p "Username (ssh)[recherya]: " stage_username
+        if [ -z "${stage_username}" ]; then stage_username="recherya"; fi
+
+    echo
+    echo "Stage Datenbank Angaben"
+    echo "-------------------------------------------------------------------------"
+    echo
+
+    read -p "DB Name: " stage_db_name
+
+    read -p "DB User [${stage_db_name}]: " stage_db_user
+    if [ -z $stage_db_user ]; then stage_db_user=$stage_db_name; fi
+
+    read -p "DB Passwort: " stage_db_pwd
+    # escape stage_db_pwd
+    stage_db_pwd="'${stage_db_pwd}'"
+
+    read -p "Host [recherya.mysql.db.hostpoint.ch] : " stage_db_host
+    if [ -z $stage_db_host ]; then stage_db_host="recherya.mysql.db.hostpoint.ch"; fi
+
+fi
+
+# Live-Server Angaben
+
+cat << EOF
+
+Hast Du Angaben zum Live-Server (Domain, Pfad, Datenbank) bereit?
+    [j] ja
+    [n] nein
+
+EOF
+
+read -p "[j|n]: " enter_live_data
+
+if [ "$enter_live_data" == 'j' ] || [ "$enter_live_data" == 'y' ]; then
+    echo
+    echo "Live-Server Angaben"
+    echo "-------------------------------------------------------------------------"
+    echo
+
+    read -p "Domain [${project_name}.ch]: " live_domain
+    if [ -z "${live_domain}" ]; then live_domain="${project_name}.ch"; fi
+
+    live_path="~/www/$live_domain/$public_folder/"
+
+    echo
+    echo "Meine Vorgabe für den Pfad:"
+    echo $live_path
+    echo
+
+    read -p "Pfad ändern? [j|N] : " change_live_path
+    if [ "$change_live_path" == 'j' ] || [ "$change_live_path" == 'y' ]; then
+        read -p "Neuer Pfad: " new_live_path
+        if [ ! -z $new_live_path ]; then
+            live_path=$new_live_path;
+        fi
+    fi
+
+    read -p "Username (ssh): [recherya]" live_username
+    if [ -z "${live_username}" ]; then live_username="recherya"; fi
+
+    echo
+    echo "Live Datenbank Angaben"
+    echo "-------------------------------------------------------------------------"
+    echo
+
+    read -p "DB Name: " live_db_name
+
+    read -p "DB User[${stage_db_user}] : " live_db_user
+    if [ -z $live_db_user ]; then live_db_user=$stage_db_user; fi
+
+    read -p "DB Passwort[${stage_db_pwd}]: " live_db_pwd
+    if [ -z $live_db_pwd ]; then live_db_pwd=$stage_db_pwd; else live_db_pwd="'${live_db_pwd}'"; fi
+
+    read -p "Host [recherya.mysql.db.hostpoint.ch] : " live_db_host
+    if [ -z "${live_db_host}" ]; then live_db_host="recherya.mysql.db.hostpoint.ch"; fi
+
+fi
+
+if [ ${project_name} != ${current_dir} ]; then
+    echo "Erstelle Verzeichnis «${project_name}»"
+    mkdir ${project_name}
+    cd ${project_name}
+fi
+
+# clone Repo
+echo "-------------------------------------------------------------------------"
+git clone $repo_uri $setup_name
+mv ${setup_name}/src/.siteconfig.yaml ./
+rm -rf ${setup_name}
+
+
+# sed (search/replace)
+# -----------------------------------------------------------------------------
+
+sedescape "_SITE_NAME_" "${sitename}" .siteconfig.yaml
+
+sedescape "${project_name_replace}" "${project_name}" .siteconfig.yaml
+
+sedescape "${ip_replace}" "${new_ip}" .siteconfig.yaml
+
+sedescape "project: _PROJEKT_NAME_" "project: ${project_name}" .siteconfig.yaml
+
+sedescape "prototype:" "prototype: ${prototype}" .siteconfig.yaml
+
+sedescape "frontend_structur:" "frontend_structur: ${frontend_struct}" .siteconfig.yaml
+
+sedescape "dev_path:" "dev_path: ${frontend_dev_folder}" .siteconfig.yaml
+
+sedescape "public_path:" "public_path: ${public_folder}" .siteconfig.yaml
+
+sedescape "${version_replace}" "${version}" .siteconfig.yaml
+
+# Replace «cms»
+sedescape "cms:" "cms: ${cms}" .siteconfig.yaml
+
+if [ "$enter_local_data" == 'j' ] || [ "$enter_local_data" == 'y' ] || [ "$enter_local_data" == 'v' ]; then
+    sedescape "local_db_host:" "local_db_host: ${local_db_host}" .siteconfig.yaml
+    sedescape "local_db_name:" "local_db_name: ${local_db_name}" .siteconfig.yaml
+    sedescape "local_db_user:" "local_db_user: ${local_db_user}" .siteconfig.yaml
+    sedescape "local_db_pwd:" "local_db_pwd: ${local_db_pwd}" .siteconfig.yaml
+fi
+
+
+# .siteconfig.yaml Live Server Data
+if [ "$enter_live_data" == 'j' ]; then
+    sedescape "live_domain:" "live_domain: ${live_domain}" .siteconfig.yaml
+    sedescape "live_username:" "live_username: ${live_username}" .siteconfig.yaml
+    sedescape "live_path:" "live_path: ${live_path}" .siteconfig.yaml
+    sedescape "live_db_host:" "live_db_host: ${live_db_host}" .siteconfig.yaml
+    sedescape "live_db_name:" "live_db_name: ${live_db_name}" .siteconfig.yaml
+    sedescape "live_db_user:" "live_db_user: ${live_db_user}" .siteconfig.yaml
+    sedescape "live_db_pwd:" "live_db_pwd: ${live_db_pwd}" .siteconfig.yaml
+fi
+
+# .siteconfig.yaml Stage Server Data
+if [ "$enter_stage_data" == 'j' ]; then
+    sedescape "stage_domain:" "stage_domain: ${stage_domain}" .siteconfig.yaml
+    sedescape "stage_username:" "stage_username: ${stage_username}" .siteconfig.yaml
+    sedescape "stage_path:" "stage_path: ${stage_path}" .siteconfig.yaml
+    sedescape "stage_db_host:" "stage_db_host: ${stage_db_host}" .siteconfig.yaml
+    sedescape "stage_db_name:" "stage_db_name: ${stage_db_name}" .siteconfig.yaml
+    sedescape "stage_db_user:" "stage_db_user: ${stage_db_user}" .siteconfig.yaml
+    sedescape "stage_db_pwd:" "stage_db_pwd: ${stage_db_pwd}" .siteconfig.yaml
+fi
+
+
+echo
+echo
+cat .siteconfig.yaml
+echo "--------------------------------------------------------------------------------------"
+echo "Trage nun die oben aufgeführten Informationen in 1Password ein und Bestätige mit ENTER"
+echo "--------------------------------------------------------------------------------------"
+echo
+
+read -p "Meine Zugangsdaten wurden gespeichert." go_ahead
+

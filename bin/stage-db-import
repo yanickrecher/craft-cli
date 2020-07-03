@@ -1,0 +1,126 @@
+#!/bin/bash
+
+# DEFAULTS
+# =========================================================================
+
+help=""
+override="";
+db_dump_file="db/db.sql"
+db_backup_path="${HOME}/db-backups/"
+
+
+# get options/arguments
+while getopts :h:o option
+do
+    case "${option}"
+    in
+        h) help="help";;
+        o) override="true";;
+    esac
+done
+
+
+# display help
+# -------------------------------------------------------------------------
+
+if [[ "${help}" == "help" ]]; then
+cat << EOF
+
+-------------------------------------------------------------------------
+HELP
+-------------------------------------------------------------------------
+
+Importiert db/db.sql auf einen Stage-Server
+
+Du musst im Hauptverzeichnis eines Projekts sein, damit das klappt.
+Das File db/db.sql muss vorhanden sein.
+
+-------------------------------------------------------------------------
+
+EOF
+exit
+fi
+
+# Prüfe db File
+if [ ! -e "${db_dump_file}" ]
+then
+    echo "${db_dump_file} nicht gefunden. "; echo "Abbruch"; echo
+    if [ "${override}" == "" ]; then exit; fi
+fi
+
+if [ ! -e .siteconfig.yaml ]; then
+    "Kein .siteconfig.yaml File gefunden. "; echo "Abbruch"; echo
+    if [ "${override}" == "" ]; then exit; fi
+fi
+
+# read .siteconfig.yaml
+. yaml-read
+
+# Check DB vars
+if [ -z $stage_username ] || [ -z $stage_domain ] || [ -z $stage_db_host ] || [ -z $stage_db_name ] || [ -z $stage_db_user ] || [ -z $stage_db_pwd ]; then
+    cat << EOF
+
+Es sind nicht alle nötigen Variabeln in .siteconfig.yaml definiert:
+
+    stage_username: $stage_username
+    stage_domain:   $stage_domain
+    stage_db_host:  $stage_db_host
+    stage_db_name:  $stage_db_name
+    stage_db_user:  $stage_db_user
+    stage_db_pwd:   $stage_db_pwd
+EOF
+    if [ "${override}" == "" ]; then exit; fi
+else
+
+    # Check backup directory
+    if [ ! -d ${db_backup_path} ]
+    then
+        mkdir ${db_backup_path}
+    fi
+
+    # Create backup filename
+    db_backup_date=$(date +"%Y-%m-%d_%H-%M-%S")
+    db_backup_filename="${stage_domain}-bk-${db_backup_date}.sql"
+    db_backup_filepath="${db_backup_path}${db_backup_filename}"
+
+cat << EOF
+
+=========================================================================
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+Datenbank "${stage_db_name}" auf "${stage_domain}" wird ÜBERSCHRIEBEN
+
+Erstelle Backup in
+"${db_backup_filepath}"
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+=========================================================================
+
+EOF
+
+    if [ "${override}" == "" ]; then
+        read -p "Datenbank auf Server überschreiben? [y|N] " import_db
+    else
+        import_db="y";
+    fi
+
+    if [ "${import_db}" != 'y' ]; then
+        echo "Abbruch"; echo
+        if [ "${override}" == "" ]; then exit; fi
+    else
+        echo "Creating Backup in ${db_backup_filepath}"; echo
+
+        bk_cmd="mysqldump -h ${stage_db_host} --user=${stage_db_user} --password=\"${stage_db_pwd}\" --opt --default-character-set=utf8 ${stage_db_name}"
+        (ssh ${stage_username}@${stage_domain} $bk_cmd) > ${db_backup_filepath}
+
+
+        echo "Importiere db.sql auf Stage-Site: $stage_domain"; echo
+
+        # Import DB-Dump into MySQL DB through SSH tunnel
+        # mysql -h ${db_host} -P 3307 --user=${db_user} --password="$db_password" --default-character-set=utf8 ${db_name} < db/${filename}
+        cmd="cat - | mysql -h ${stage_db_host} --user=${stage_db_user} --password=\"${stage_db_pwd}\" --default-character-set=utf8 ${stage_db_name}"
+        cat ${db_dump_file} | (ssh ${stage_username}@${stage_domain} $cmd)
+
+    fi
+
+fi

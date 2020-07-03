@@ -1,0 +1,90 @@
+#!/bin/bash
+
+# DEFAULTS
+# =========================================================================
+
+help=""
+
+db_dump_file="db/db.sql"
+vagrant_db_dump_file="/vagrant/${db_dump_file}"
+
+# get options/arguments
+while getopts :h option
+do
+    case "${option}"
+    in
+        h) help="help";;
+    esac
+done
+
+# display help
+
+if [[ "${help}" == "help" ]]; then
+cat << EOF
+
+-------------------------------------------------------------------------
+HELP
+-------------------------------------------------------------------------
+
+Importiert einen DB-Dump in die locale DB
+Liest aus einem File mit Pfad db/db.sql
+
+Du musst im Hauptverzeichnis eines Projekts sein, damit das klappt.
+Das Verzeichnis db/ muss vorhanden sein.
+
+-------------------------------------------------------------------------
+
+EOF
+exit
+fi
+
+# Prüfe db File
+if [ ! -e "${db_dump_file}" ]
+then
+    echo "${db_dump_file} nicht gefunden. "; echo "Abbruch"; echo
+    exit
+fi
+
+# read .siteconfig.yaml
+. yaml-read
+
+# Check DB vars
+if [ -z $local_db_host ] || [ -z $local_db_name ] || [ -z $local_db_user ] || [ -z $local_db_pwd ]; then
+    cat << EOF
+
+Es sind nicht alle nötigen Variabeln in .siteconfig.yaml definiert:
+
+    local_db_host:  $local_db_host
+    local_db_name:  $local_db_name
+    local_db_user:  $local_db_user
+    local_db_pwd:   $local_db_pwd
+
+EOF
+exit
+fi
+
+cat << EOF
+
+=========================================================================
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+Datenbank wird local ÜBERSCHRIEBEN
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+=========================================================================
+
+EOF
+
+read -p "Datenbank in Vagrant überschreiben? [y|N] " import_db
+if [ "${import_db}" != 'y' ]; then
+    echo "Abbruch"; echo
+    exit
+fi
+
+echo "Importiere db.sql auf Vagrant Box"; echo
+
+
+# Import DB (Shell-Command vorbereiten)
+/Applications/MAMP/Library/bin/mysql --user=${local_db_user} --password=${local_db_pwd} --default-character-set=utf8 ${local_db_name} < ${db_dump_file}
+
+

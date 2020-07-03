@@ -1,0 +1,79 @@
+#!/bin/bash
+
+# DEFAULTS
+# =========================================================================
+
+help=""
+
+db_dump_file="db/db.sql"
+
+# get options/arguments
+while getopts :h option
+do
+    case "${option}"
+    in
+        h) help="help";;
+    esac
+done
+
+
+# display help
+# -------------------------------------------------------------------------
+
+if [[ "${help}" == "help" ]]; then
+cat << EOF
+
+-------------------------------------------------------------------------
+HELP
+-------------------------------------------------------------------------
+
+Erstellt einen DB-Dump von einem Live-Server
+Schreibt ein File mit Pfad db/db.sql
+
+Du musst im Hauptverzeichnis eines Projekts sein, damit das klappt.
+Das Verzeichnis db/ muss vorhanden sein.
+
+-------------------------------------------------------------------------
+
+EOF
+exit
+fi
+
+# Prüfe, Verzeichnisse und Files
+if [ ! -d db ]
+then
+    echo "Kann kein db/ Verzeichnis finden. "; echo "Abbruch"; echo
+    exit
+fi
+
+if [ ! -e .siteconfig.yaml ]; then
+    "Kein .siteconfig.yaml File gefunden. "; echo "Abbruch"; echo
+    exit
+fi
+
+# read .siteconfig.yaml
+. yaml-read
+
+# Check DB vars
+if [ -z $live_username ] || [ -z $live_domain ] || [ -z $live_db_host ] || [ -z $live_db_name ] || [ -z $live_db_user ] || [ -z $live_db_pwd ]; then
+    cat << EOF
+
+Es sind nicht alle nötigen Variabeln in .siteconfig.yaml definiert:
+
+    live_username: $live_username
+    live_domain:   $live_domain
+    live_db_host:  $live_db_host
+    live_db_name:  $live_db_name
+    live_db_user:  $live_db_user
+    live_db_pwd:   $live_db_pwd
+EOF
+exit
+fi
+
+
+echo "DB dump von Live-Site: $live_domain"; echo
+
+
+# Dump MySQL DB through SSH tunnel
+cmd="mysqldump -h ${live_db_host} --user=${live_db_user} --password=\"${live_db_pwd}\" --opt --default-character-set=utf8 ${live_db_name}"
+(ssh ${live_username}@${live_domain} $cmd) > ${db_dump_file}

@@ -1,0 +1,170 @@
+#!/bin/bash
+#
+# Files und Bilder von public/assets/ synchronisieren
+
+# DEFAULTS
+# =========================================================================
+
+help=""
+remove=""
+override=""
+path="../vendor"
+
+# get options/arguments
+while getopts :p:d:r:o:h option
+do
+    case "${option}"
+    in
+        h) help="help";;
+        r) remove="remove";;
+        o) override="true";;
+        d) direction=${OPTARG};;
+        p) path=${OPTARG};;
+    esac
+done
+
+# display help
+# -------------------------------------------------------------------------
+
+if [ "${help}" == "help" ]; then
+
+cat << EOF
+
+-------------------------------------------------------------------------
+HELP sync-assets
+-------------------------------------------------------------------------
+
+Synchronisiert Dateien in vendor
+
+Optionen:
+    -d down     Live-Server nach Lokal (Standard)
+    -d up       Lokal nach Live-Server
+
+    -p path     Relativer Pfad von Web-Root
+                    für ./public/assets: -p assets
+
+    -r          lösche überflüssige Files auf Ziel
+
+-------------------------------------------------------------------------
+
+EOF
+exit
+fi
+
+# .siteconfig.yaml einlesen
+# -------------------------------------------------------------------------
+
+# Prüfe .siteconfig.yaml
+if [ ! -e .siteconfig.yaml ]
+then
+    echo
+    echo "In diesem Verzeichnis ist kein .siteconfig.yaml File zu finden. "; echo "Abbruch"; echo ""
+    exit
+fi
+
+# read .siteconfig.yaml
+. yaml-read
+
+# Check siteconfig vars
+if [ -z $live_username ] || [ -z $live_domain ] || [ -z $live_path ] || [ -z $public_path ]
+then
+    cat << EOF
+
+Es sind nicht alle nötigen Variabeln in .siteconfig.yaml definiert:
+
+    live_username: $live_username
+    live_domain:   $live_domain
+    live_path:     $live_path
+    public_path:   $public_path
+
+EOF
+    exit;
+else
+
+    rsync_local_path="$(pwd)/${public_path}/${path}"
+    rsync_live_path="${live_path}${path}"
+
+    # Confirm Command
+    # -------------------------------------------------------------------------
+
+    if [ "${direction}" == "down" ] || [ -z ${direction} ]; then
+        updown="Download"
+        echo
+        echo "DOWNLOAD assets"
+        echo "---------------------------------------------------"
+        echo "SSH:          ${live_username}@${live_domain}"
+        echo "Pfad Lokal:   $rsync_local_path"
+        echo "Pfad Live:    ${rsync_live_path}"
+        if [ "${remove}" == "remove" ]; then
+            echo "Überflüssige Files Lokal werden gelöscht"
+        fi
+        echo
+    else
+        if [ "${direction}" == "up" ]; then
+            updown="Upload"
+            echo
+            echo "UPLOAD assets"
+            echo "---------------------------------------------------"
+            echo "SSH:          ${live_username}@${live_domain}"
+            echo "Pfad Lokal:   $rsync_local_path"
+            echo "Pfad Live:    ${rsync_live_path}"
+            if [ "${remove}" == "remove" ]; then
+                echo "Überflüssige Files auf Server werden gelöscht"
+            fi
+            echo
+        fi
+    fi
+
+    if [ "${override}" == "" ]; then
+
+        echo "${updown} ausführen?"
+        read -p "[j|N]: " do_rsync
+
+        if [ "${do_rsync}" != 'j' ] && [ "${do_rsync}" != 'y' ]; then
+            echo; echo "Abbruch"; echo
+            exit
+        fi
+
+    fi
+
+    # Sync with rsynch
+    # -------------------------------------------------------------------------
+
+    # rsync [-options] source target
+    #
+    # --delete          delete extraneous files from dest dirs
+    # -a                archive mode; equals -rlptgoD (no -H,-A,-X)
+    # -v                increase verbosity
+    # -z                compress file data during the transfer
+    # -e ssh            specify the remote shell to use -> SSH
+
+    if [ "${direction}" == "down" ] || [ -z ${direction} ]; then
+
+        # Down
+        # ----
+
+        if [ "${remove}" == "remove" ]; then
+            rsync --delete -avze ssh ${live_username}@${live_domain}:${rsync_live_path}/ $rsync_local_path
+        else
+            rsync -avze ssh ${live_username}@${live_domain}:${rsync_live_path}/ $rsync_local_path
+        fi
+
+    else
+        if [ "${direction}" == "up" ]; then
+
+            # Up
+            # --
+
+            if [ "${remove}" == "remove" ]; then
+                rsync --delete -avze ssh ${rsync_local_path}/ ${live_username}@${live_domain}:${rsync_live_path}
+            else
+                rsync -avze ssh ${rsync_local_path}/ ${live_username}@${live_domain}:${rsync_live_path}
+            fi
+
+        else
+            echo "Die Richtung (-d ${direction}) kenne ich nicht"; echo
+        fi
+
+    fi
+
+fi

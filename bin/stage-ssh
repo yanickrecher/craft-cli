@@ -1,0 +1,60 @@
+#!/bin/bash
+
+# DEFAULTS
+# =========================================================================
+
+help=""
+
+# get options/arguments
+while getopts :h option
+do
+    case "${option}"
+    in
+        h) help="help";;
+    esac
+done
+
+
+# display help
+# -------------------------------------------------------------------------
+
+if [[ "${help}" == "help" ]]; then
+cat << EOF
+
+-------------------------------------------------------------------------
+HELP
+-------------------------------------------------------------------------
+
+ssh auf den Stage-Webserver des aktuellen Projekts
+
+-------------------------------------------------------------------------
+
+EOF
+exit
+fi
+
+if [ ! -e .siteconfig.yaml ]; then
+    "Kein .siteconfig.yaml File gefunden. "; echo "Abbruch"; echo
+    exit
+fi
+
+# read .siteconfig.yaml
+. yaml-read
+
+# Check siteconfig vars
+if [ -z $stage_username ] || [ -z $stage_domain ] || [ -z $stage_path ]; then
+    cat << EOF
+
+Es sind nicht alle nötigen Variabeln in .siteconfig.yaml definiert:
+
+    stage_username: $stage_username
+    stage_domain:   $stage_domain
+    stage_db_host:  $stage_path
+EOF
+exit
+fi
+
+# SSH auf den Server
+ssh -t ${stage_username}@${stage_domain} "cd ${stage_path} && cd .. ; bash"
+
+
