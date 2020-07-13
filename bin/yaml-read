@@ -1,0 +1,103 @@
+#!/bin/bash
+#
+# Variabeln aus .siteconfig.yaml in die Bash-Shell laden
+
+
+# get options/arguments
+while getopts h:p: option
+do
+    case "${option}"
+    in
+        h) help="help";;
+        p) projectpath_arg=${OPTARG};;
+    esac
+done
+
+
+if [[ "${help}" == "help" ]]; then
+cat << EOF
+
+-------------------------------------------------------------------------
+HELP
+-------------------------------------------------------------------------
+
+    Liest das Konfigurationsfile aus dem Projektverzeichnis aus.
+
+    Dem Befehl yaml-read kann auch ein parameter -p"pfadname/des/projekts"
+    für den auszulesenden Pfad angegeben werden.
+-------------------------------------------------------------------------
+
+EOF
+exit
+fi
+
+if ! [ "$projectpath_arg" == "" ] && [ -e "${projectpath_arg}/.siteconfig.yaml" ]; then
+
+cd ${projectpath_arg}
+
+else
+
+    if ! [ -e ".siteconfig.yaml" ]; then
+
+cat << EOF
+
+    Wie es scheint befindest du dich nicht im Projektverzeichnis,
+    oder du hast in deinem Projekt noch kein siteconfig.yaml angelegt.
+
+    Führe setup-project für das erstellen eines kompletten Projekts aus,
+    oder einfach setup-siteconfig für das erstellen eines neuen .siteconfig.yaml files.
+
+    Du hast nun folgende Optionen:
+    [p] => den Projektpfad angeben in dem sich deine Siteconfig befindet
+    [s] => den Befehl setup-siteconfig ausführen lassen um danach Hier weiterfahren zu können
+    [a] => aktion abbrechen
+
+EOF
+        read -p "Wähle [p]|[s][a]: " next_stepp
+        if ! [ "$next_stepp" == "p" ] && ! [ "$next_stepp" == "s" ] && ! [ "$next_stepp" == "a" ]; then
+            read -p "[$next_stepp] ist keine Gültige Eingabe, Wähle eine der folgenden [p]|[s][a]: " next_stepp
+            if ! [ "$next_stepp" == "p" ] && ! [ "$next_stepp" == "s" ] && ! [ "$next_stepp" == "a" ]; then
+                echo "Abbruch durch wiederholt ungültige Angabe."
+                echo "Ich bin mir sich bei einem weiteren Versuch wirst du es schaffen. :-)"
+                exit;
+            fi
+        fi
+
+        if [ "$next_stepp" == "a" ] || [ "$next_stepp" == "" ]; then
+            echo "Das erstellen wurde abgebrochen... !!!";
+            exit;
+        fi
+        if [ "$next_stepp" == "p" ]; then
+            read -p "In diesem Fall gib den richtigen Pfad ein, so das wir fortfahren können: " project_path
+            cd ${project_path}
+        else
+            if [ "$next_stepp" == "s" ]; then
+                echo "Du hast dich für das erstellen des .siteconfig.yaml File entschieden."
+                echo ".....Starte das Setup...."
+                . setup-siteconfig
+            else
+                echo "Keine Gültige Eingabe... Abbruch!!!"
+                exit;
+            fi
+        fi
+    fi
+fi
+
+echo "Siteconfig wird ausgelesen"
+echo ""
+
+path_to_script="${BASH_SOURCE%/*}/_php/yaml-read.php"
+path_to_config="$(pwd)/.siteconfig.yaml"
+eval $(php ${path_to_script} -- "${path_to_config}")
+
+
+# cat << EOF
+
+#     live_username: $live_username
+#     live_domain:   $live_domain
+#     live_db_host:  $live_db_host
+#     live_db_name:  $live_db_name
+#     live_db_user:  $live_db_user
+#     live_db_pwd:   $live_db_pwd
+#     live_path:     $live_path
+# EOF

@@ -8,7 +8,7 @@
 help=""
 remove=""
 override=""
-path="uploads/"
+path="../vendor/"
 
 # get options/arguments
 while getopts :p:d:r:o:h option
@@ -31,7 +31,7 @@ if [ "${help}" == "help" ]; then
 cat << EOF
 
 -------------------------------------------------------------------------
-HELP sync-assets
+HELP sync-vendor
 -------------------------------------------------------------------------
 
 Synchronisiert Dateien in public/assets/*

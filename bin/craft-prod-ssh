@@ -25,7 +25,7 @@ cat << EOF
 HELP
 -------------------------------------------------------------------------
 
-ssh auf den Live-Webserver des aktuellen Projekts
+ssh auf den Prod-Webserver des aktuellen Projekts
 
 -------------------------------------------------------------------------
 
@@ -42,19 +42,19 @@ fi
 . yaml-read
 
 # Check siteconfig vars
-if [ -z $live_username ] || [ -z $live_domain ] || [ -z $live_path ]; then
+if [ -z $prod_username ] || [ -z $prod_domain ] || [ -z $prod_path ]; then
     cat << EOF
 
 Es sind nicht alle nötigen Variabeln in .siteconfig.yaml definiert:
 
-    live_username: $live_username
-    live_domain:   $live_domain
-    live_db_host:  $live_path
+    prod_username: $prod_username
+    prod_domain:   $prod_domain
+    prod_db_host:  $prod_path
 EOF
 exit
 fi
 
 # SSH auf den Server
-ssh -t ${live_username}@${live_domain} "cd ${live_path} && cd .. ; bash"
+ssh -t ${prod_username}@${prod_domain} "cd ${prod_path} && cd .. ; bash"
 
 

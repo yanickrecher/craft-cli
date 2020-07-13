@@ -8,7 +8,7 @@
 help=""
 remove=""
 override=""
-path="../vendor/"
+path="assets"
 
 # get options/arguments
 while getopts :p:d:r:o:h option
@@ -37,8 +37,8 @@ HELP sync-assets
 Synchronisiert Dateien in public/assets/*
 
 Optionen:
-    -d down     Stage-Server nach Lokal (Standard)
-    -d up       Lokal nach Stage-Server
+    -d down     Prod-Server nach Lokal (Standard)
+    -d up       Lokal nach Prod-Server
 
     -p path     Relativer Pfad von Web-Root
                     für ./public/assets: -p assets
@@ -66,23 +66,23 @@ fi
 . yaml-read
 
 # Check siteconfig vars
-if [ -z $stage_username ] || [ -z $stage_domain ] || [ -z $stage_path ] || [ -z $public_path ]
+if [ -z $prod_username ] || [ -z $prod_domain ] || [ -z $prod_path ] || [ -z $public_path ]
 then
     cat << EOF
 
 Es sind nicht alle nötigen Variabeln in .siteconfig.yaml definiert:
 
-    stage_username: $stage_username
-    stage_domain:   $stage_domain
-    stage_path:     $stage_path
-    public_path:      $public_path
+    prod_username: $prod_username
+    prod_domain:   $prod_domain
+    prod_path:     $prod_path
+    public_path:   $public_path
 
 EOF
     exit;
 else
 
     rsync_local_path="$(pwd)/${public_path}/${path}"
-    rsync_stage_path="${stage_path}${path}"
+    rsync_prod_path="${prod_path}${path}"
 
     # Confirm Command
     # -------------------------------------------------------------------------
@@ -92,9 +92,9 @@ else
         echo
         echo "DOWNLOAD assets"
         echo "---------------------------------------------------"
-        echo "SSH:          ${stage_username}@${stage_domain}"
+        echo "SSH:          ${prod_username}@${prod_domain}"
         echo "Pfad Lokal:   $rsync_local_path"
-        echo "Pfad Live:    ${rsync_stage_path}"
+        echo "Pfad Prod:    ${rsync_prod_path}"
         if [ "${remove}" == "remove" ]; then
             echo "Überflüssige Files Lokal werden gelöscht"
         fi
@@ -105,9 +105,9 @@ else
             echo
             echo "UPLOAD assets"
             echo "---------------------------------------------------"
-            echo "SSH:          ${stage_username}@${stage_domain}"
+            echo "SSH:          ${prod_username}@${prod_domain}"
             echo "Pfad Lokal:   $rsync_local_path"
-            echo "Pfad Live:    ${rsync_stage_path}"
+            echo "Pfad Prod:    ${rsync_prod_path}"
             if [ "${remove}" == "remove" ]; then
                 echo "Überflüssige Files auf Server werden gelöscht"
             fi
@@ -144,9 +144,9 @@ else
         # ----
 
         if [ "${remove}" == "remove" ]; then
-            rsync --delete -avze ssh ${stage_username}@${stage_domain}:${rsync_stage_path}/ $rsync_local_path
+            rsync --delete -avze ssh ${prod_username}@${prod_domain}:${rsync_prod_path}/ $rsync_local_path
         else
-            rsync -avze ssh ${stage_username}@${stage_domain}:${rsync_stage_path}/ $rsync_local_path
+            rsync -avze ssh ${prod_username}@${prod_domain}:${rsync_prod_path}/ $rsync_local_path
         fi
 
     else
@@ -156,9 +156,9 @@ else
             # --
 
             if [ "${remove}" == "remove" ]; then
-                rsync --delete -avze ssh ${rsync_local_path}/ ${stage_username}@${stage_domain}:${rsync_stage_path}
+                rsync --delete -avze ssh ${rsync_local_path}/ ${prod_username}@${prod_domain}:${rsync_prod_path}
             else
-                rsync -avze ssh ${rsync_local_path}/ ${stage_username}@${stage_domain}:${rsync_stage_path}
+                rsync -avze ssh ${rsync_local_path}/ ${prod_username}@${prod_domain}:${rsync_prod_path}
             fi
 
         else

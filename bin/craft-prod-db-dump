@@ -27,7 +27,7 @@ cat << EOF
 HELP
 -------------------------------------------------------------------------
 
-Erstellt einen DB-Dump von einem Live-Server
+Erstellt einen DB-Dump von einem Prod-Server
 Schreibt ein File mit Pfad db/db.sql
 
 Du musst im Hauptverzeichnis eines Projekts sein, damit das klappt.
@@ -55,25 +55,25 @@ fi
 . yaml-read
 
 # Check DB vars
-if [ -z $live_username ] || [ -z $live_domain ] || [ -z $live_db_host ] || [ -z $live_db_name ] || [ -z $live_db_user ] || [ -z $live_db_pwd ]; then
+if [ -z $prod_username ] || [ -z $prod_domain ] || [ -z $prod_db_host ] || [ -z $prod_db_name ] || [ -z $prod_db_user ] || [ -z $prod_db_pwd ]; then
     cat << EOF
 
 Es sind nicht alle nötigen Variabeln in .siteconfig.yaml definiert:
 
-    live_username: $live_username
-    live_domain:   $live_domain
-    live_db_host:  $live_db_host
-    live_db_name:  $live_db_name
-    live_db_user:  $live_db_user
-    live_db_pwd:   $live_db_pwd
+    prod_username: $prod_username
+    prod_domain:   $prod_domain
+    prod_db_host:  $prod_db_host
+    prod_db_name:  $prod_db_name
+    prod_db_user:  $prod_db_user
+    prod_db_pwd:   $prod_db_pwd
 EOF
 exit
 fi
 
 
-echo "DB dump von Live-Site: $live_domain"; echo
+echo "DB dump von Prod-Site: $prod_domain"; echo
 
 
 # Dump MySQL DB through SSH tunnel
-cmd="mysqldump -h ${live_db_host} --user=${live_db_user} --password=\"${live_db_pwd}\" --opt --default-character-set=utf8 ${live_db_name}"
-(ssh ${live_username}@${live_domain} $cmd) > ${db_dump_file}
+cmd="mysqldump -h ${prod_db_host} --user=${prod_db_user} --password=\"${prod_db_pwd}\" --opt --default-character-set=utf8 ${prod_db_name}"
+(ssh ${prod_username}@${prod_domain} $cmd) > ${db_dump_file}
