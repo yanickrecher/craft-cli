@@ -93,11 +93,11 @@ eval $(php ${path_to_script} -- "${path_to_config}")
 
 # cat << EOF
 
-#     live_username: $live_username
-#     live_domain:   $live_domain
-#     live_db_host:  $live_db_host
-#     live_db_name:  $live_db_name
-#     live_db_user:  $live_db_user
-#     live_db_pwd:   $live_db_pwd
-#     live_path:     $live_path
+#     prod_username: $prod_username
+#     prod_domain:   $prod_domain
+#     prod_db_host:  $prod_db_host
+#     prod_db_name:  $prod_db_name
+#     prod_db_user:  $prod_db_user
+#     prod_db_pwd:   $prod_db_pwd
+#     prod_path:     $prod_path
 # EOF

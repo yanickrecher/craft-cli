@@ -34,13 +34,13 @@ HELP setup-create-env-file
 
 Erstellt die .env datei für Craft 3.
 Der Befehl erwartet ein Argument -e für Environtment
-erlaupte werte sind [local, stage, live].
-Wird live oder stage gesetzt, so wird die datei automatisch
+erlaupte werte sind [local, stage, prod].
+Wird prod oder stage gesetzt, so wird die datei automatisch
 per ssh Tunnel auf die gewünschte Umgebung kopiert
 (sofern diese in der .siteconfig datei definiert ist).
 
 Optionen:
-    -e      Setze die Umgebung local stage live
+    -e      Setze die Umgebung local stage prod
 
 -------------------------------------------------------------------------
 
@@ -52,7 +52,7 @@ echo "Die benutze Umgebung ${env}"
 
 if [ -z "${env}" ]; then
     echo "Die Umgebung wurde nicht definiert.";
-    echo "Einer der folgenden Werte wird erwartet [local|stage|live]";
+    echo "Einer der folgenden Werte wird erwartet [local|stage|prod]";
 else
 
     . yaml-read
@@ -75,19 +75,19 @@ else
 
     env_prefix=""
 
-    if [ ${env} == "live" ]; then
-        env_prefix="live"
-        env_dbHost=${live_db_host}
-        env_dbUser=${live_db_user}
-        env_dbName=${live_db_name}
-        env_dbPass=${live_db_pwd}
+    if [ ${env} == "prod" ]; then
+        env_prefix="prod"
+        env_dbHost=${prod_db_host}
+        env_dbUser=${prod_db_user}
+        env_dbName=${prod_db_name}
+        env_dbPass=${prod_db_pwd}
         env_emailSenderName=${sitename}
         env_hostname=""
         env_smtpPort=""
 
-        scp_username=${live_username}
-        scp_domain=${live_domain}
-        scp_path=${live_path}
+        scp_username=${prod_username}
+        scp_domain=${prod_domain}
+        scp_path=${prod_path}
     fi
 
     if [ ${env} == "stage" ]; then
@@ -173,7 +173,7 @@ EMAIL_SMTPPORT="${env_smtpPort}"
 
 EOF
 
-    if [ "${env}" == "stage" ] || [ "${env}" == "live" ]; then
+    if [ "${env}" == "stage" ] || [ "${env}" == "prod" ]; then
         # Die erstellte .env Datei muss noch hochgeladen werden
 
         if [ -z "${scp_username}" ] || [ -z "${scp_domain}" ]; then

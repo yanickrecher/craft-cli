@@ -372,60 +372,60 @@ if [ "$enter_stage_data" == 'j' ] || [ "$enter_stage_data" == 'y' ]; then
 
 fi
 
-# Live-Server Angaben
+# Prod-Server Angaben
 
 cat << EOF
 
-Hast Du Angaben zum Live-Server (Domain, Pfad, Datenbank) bereit?
+Hast Du Angaben zum Prod-Server (Domain, Pfad, Datenbank) bereit?
     [j] ja
     [n] nein
 
 EOF
 
-read -p "[j|n]: " enter_live_data
+read -p "[j|n]: " enter_prod_data
 
-if [ "$enter_live_data" == 'j' ] || [ "$enter_live_data" == 'y' ]; then
+if [ "$enter_prod_data" == 'j' ] || [ "$enter_prod_data" == 'y' ]; then
     echo
-    echo "Live-Server Angaben"
+    echo "Prod-Server Angaben"
     echo "-------------------------------------------------------------------------"
     echo
 
-    read -p "Domain [${project_name}.ch]: " live_domain
-    if [ -z "${live_domain}" ]; then live_domain="${project_name}.ch"; fi
+    read -p "Domain [${project_name}.ch]: " prod_domain
+    if [ -z "${prod_domain}" ]; then prod_domain="${project_name}.ch"; fi
 
-    live_path="~/www/$live_domain/$public_folder/"
+    prod_path="~/www/$prod_domain/$public_folder/"
 
     echo
     echo "Meine Vorgabe für den Pfad:"
-    echo $live_path
+    echo $prod_path
     echo
 
-    read -p "Pfad ändern? [j|N] : " change_live_path
-    if [ "$change_live_path" == 'j' ] || [ "$change_live_path" == 'y' ]; then
-        read -p "Neuer Pfad: " new_live_path
-        if [ ! -z $new_live_path ]; then
-            live_path=$new_live_path;
+    read -p "Pfad ändern? [j|N] : " change_prod_path
+    if [ "$change_prod_path" == 'j' ] || [ "$change_prod_path" == 'y' ]; then
+        read -p "Neuer Pfad: " new_prod_path
+        if [ ! -z $new_prod_path ]; then
+            prod_path=$new_prod_path;
         fi
     fi
 
-    read -p "Username (ssh): [recherya]" live_username
-    if [ -z "${live_username}" ]; then live_username="recherya"; fi
+    read -p "Username (ssh): [recherya]" prod_username
+    if [ -z "${prod_username}" ]; then prod_username="recherya"; fi
 
     echo
-    echo "Live Datenbank Angaben"
+    echo "Prod Datenbank Angaben"
     echo "-------------------------------------------------------------------------"
     echo
 
-    read -p "DB Name: " live_db_name
+    read -p "DB Name: " prod_db_name
 
-    read -p "DB User[${stage_db_user}] : " live_db_user
-    if [ -z $live_db_user ]; then live_db_user=$stage_db_user; fi
+    read -p "DB User[${stage_db_user}] : " prod_db_user
+    if [ -z $prod_db_user ]; then prod_db_user=$stage_db_user; fi
 
-    read -p "DB Passwort[${stage_db_pwd}]: " live_db_pwd
-    if [ -z $live_db_pwd ]; then live_db_pwd=$stage_db_pwd; else live_db_pwd="'${live_db_pwd}'"; fi
+    read -p "DB Passwort[${stage_db_pwd}]: " prod_db_pwd
+    if [ -z $prod_db_pwd ]; then prod_db_pwd=$stage_db_pwd; else prod_db_pwd="'${prod_db_pwd}'"; fi
 
-    read -p "Host [recherya.mysql.db.hostpoint.ch] : " live_db_host
-    if [ -z "${live_db_host}" ]; then live_db_host="recherya.mysql.db.hostpoint.ch"; fi
+    read -p "Host [recherya.mysql.db.hostpoint.ch] : " prod_db_host
+    if [ -z "${prod_db_host}" ]; then prod_db_host="recherya.mysql.db.hostpoint.ch"; fi
 
 fi
 
@@ -474,15 +474,15 @@ if [ "$enter_local_data" == 'j' ] || [ "$enter_local_data" == 'y' ] || [ "$enter
 fi
 
 
-# .siteconfig.yaml Live Server Data
-if [ "$enter_live_data" == 'j' ]; then
-    sedescape "live_domain:" "live_domain: ${live_domain}" .siteconfig.yaml
-    sedescape "live_username:" "live_username: ${live_username}" .siteconfig.yaml
-    sedescape "live_path:" "live_path: ${live_path}" .siteconfig.yaml
-    sedescape "live_db_host:" "live_db_host: ${live_db_host}" .siteconfig.yaml
-    sedescape "live_db_name:" "live_db_name: ${live_db_name}" .siteconfig.yaml
-    sedescape "live_db_user:" "live_db_user: ${live_db_user}" .siteconfig.yaml
-    sedescape "live_db_pwd:" "live_db_pwd: ${live_db_pwd}" .siteconfig.yaml
+# .siteconfig.yaml Prod Server Data
+if [ "$enter_prod_data" == 'j' ]; then
+    sedescape "prod_domain:" "prod_domain: ${prod_domain}" .siteconfig.yaml
+    sedescape "prod_username:" "prod_username: ${prod_username}" .siteconfig.yaml
+    sedescape "prod_path:" "prod_path: ${prod_path}" .siteconfig.yaml
+    sedescape "prod_db_host:" "prod_db_host: ${prod_db_host}" .siteconfig.yaml
+    sedescape "prod_db_name:" "prod_db_name: ${prod_db_name}" .siteconfig.yaml
+    sedescape "prod_db_user:" "prod_db_user: ${prod_db_user}" .siteconfig.yaml
+    sedescape "prod_db_pwd:" "prod_db_pwd: ${prod_db_pwd}" .siteconfig.yaml
 fi
 
 # .siteconfig.yaml Stage Server Data

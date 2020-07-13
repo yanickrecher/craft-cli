@@ -94,7 +94,7 @@ else
         echo "---------------------------------------------------"
         echo "SSH:          ${stage_username}@${stage_domain}"
         echo "Pfad Lokal:   $rsync_local_path"
-        echo "Pfad Live:    ${rsync_stage_path}"
+        echo "Pfad Prod:    ${rsync_stage_path}"
         if [ "${remove}" == "remove" ]; then
             echo "Überflüssige Files Lokal werden gelöscht"
         fi
@@ -107,7 +107,7 @@ else
             echo "---------------------------------------------------"
             echo "SSH:          ${stage_username}@${stage_domain}"
             echo "Pfad Lokal:   $rsync_local_path"
-            echo "Pfad Live:    ${rsync_stage_path}"
+            echo "Pfad Prod:    ${rsync_stage_path}"
             if [ "${remove}" == "remove" ]; then
                 echo "Überflüssige Files auf Server werden gelöscht"
             fi
