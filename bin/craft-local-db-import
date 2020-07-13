@@ -6,7 +6,6 @@
 help=""
 
 db_dump_file="db/db.sql"
-vagrant_db_dump_file="/vagrant/${db_dump_file}"
 
 # get options/arguments
 while getopts :h option
@@ -26,11 +25,13 @@ cat << EOF
 HELP
 -------------------------------------------------------------------------
 
-Importiert einen DB-Dump in die locale DB
+Importiert einen DB-Dump in die locale DB von Nitro
 Liest aus einem File mit Pfad db/db.sql
 
+Anforderungen:
 Du musst im Hauptverzeichnis eines Projekts sein, damit das klappt.
 Das Verzeichnis db/ muss vorhanden sein.
+Nitro muss korrekt konfiguriert sein, da der Import über nitro passiert.
 
 -------------------------------------------------------------------------
 
@@ -75,16 +76,17 @@ Datenbank wird local ÜBERSCHRIEBEN
 
 EOF
 
-read -p "Datenbank in Vagrant überschreiben? [y|N] " import_db
+read -p "Datenbank in Nitro überschreiben? [y|N] " import_db
 if [ "${import_db}" != 'y' ]; then
     echo "Abbruch"; echo
     exit
 fi
 
-echo "Importiere db.sql auf Vagrant Box"; echo
+echo "Importiere db.sql in Nitro"; echo
 
 
 # Import DB (Shell-Command vorbereiten)
-/Applications/MAMP/Library/bin/mysql --user=${local_db_user} --password=${local_db_pwd} --default-character-set=utf8 ${local_db_name} < ${db_dump_file}
-
-
+OUTPUT=$(nitro db import db/db.sql -m nitro-dev << EOF
+$local_db_name
+EOF
+)

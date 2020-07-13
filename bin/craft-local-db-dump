@@ -23,11 +23,13 @@ cat << EOF
 HELP
 -------------------------------------------------------------------------
 
-Erstellt einen DB-Dump aus einer Localen DB.
+Erstellt einen DB-Dump aus der aktuellen Lokalen Nitro DB.
 Schreibt ein File mit Pfad db/db.sql
 
+Anforderungen:
 Du musst im Hauptverzeichnis eines Projekts sein, damit das klappt.
-Das Verzeichnis db/ muss vorhanden sein.
+Der Dump db/db.sql muss vorhanden sein.
+Nitro muss korrekt konfiguriert sein, da der Dump über nitro passiert.
 
 -------------------------------------------------------------------------
 
@@ -60,7 +62,31 @@ exit
 fi
 
 
-echo "DB dump aus localer DB…"; echo
+echo "DB dump aus lokaler DB…"; echo
 
 # Dump DB
-mysqldump --user=${local_db_user} --host=localhost --password=${local_db_pwd} --opt --default-character-set=utf8 ${local_db_name} > db/db.sql
+# mysqldump --user=${local_db_user} --host=localhost --password=${local_db_pwd} --opt --default-character-set=utf8 ${local_db_name} > db/db.sql
+OUTPUT=$(nitro db backup db/db.sql -m nitro-dev << EOF
+2
+EOF
+)
+
+regex=".*([0-9]) - ${local_db_name}.*"
+[[ $OUTPUT =~ $regex ]]
+db_select=${BASH_REMATCH[1]};
+
+
+OUTPUT=$(nitro db backup db/db.sql -m nitro-dev << EOF
+$db_select
+EOF
+)
+
+#echo "----${OUTPUT}";
+regex='.*stored in "(.*)"\.'
+[[ $OUTPUT =~ $regex ]]
+db_backup=${BASH_REMATCH[1]};
+
+rm db/db.sql
+cp $db_backup db/db.sql
+
+echo "Dump in db/db.sql gespeichert"; echo
