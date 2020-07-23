@@ -25,7 +25,7 @@ cat << EOF
 HELP
 -------------------------------------------------------------------------
 
-ssh auf den Stage-Webserver des aktuellen Projekts
+connect by ssh on your STAGE-Webserver of the current project
 
 -------------------------------------------------------------------------
 
@@ -33,19 +33,14 @@ EOF
 exit
 fi
 
-if [ ! -e .siteconfig.yaml ]; then
-    "Kein .siteconfig.yaml File gefunden. "; echo "Abbruch"; echo
-    exit
-fi
-
 # read .siteconfig.yaml
-. yaml-read
+. craft-yaml-read
 
 # Check siteconfig vars
 if [ -z $stage_username ] || [ -z $stage_domain ] || [ -z $stage_path ]; then
     cat << EOF
 
-Es sind nicht alle nötigen Variabeln in .siteconfig.yaml definiert:
+It looks not all variables are defined in .siteconfig.yaml:
 
     stage_username: $stage_username
     stage_domain:   $stage_domain
@@ -55,6 +50,6 @@ exit
 fi
 
 # SSH auf den Server
-ssh -t ${stage_username}@${stage_domain} "cd ${stage_path} && cd .. ; bash"
+ssh -t ${stage_username}@${stage_domain} "cd ${stage_path} ; bash"
 
 

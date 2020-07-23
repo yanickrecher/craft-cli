@@ -30,10 +30,12 @@ cat << EOF
 HELP
 -------------------------------------------------------------------------
 
-Importiert db/db.sql auf einen Stage-Server
+Import a existing DB-Dump in your STAGE DB and override the existing DB.
+db/db.sql will be used as source.
 
-Du musst im Hauptverzeichnis eines Projekts sein, damit das klappt.
-Das File db/db.sql muss vorhanden sein.
+Requirements:
+- You have to be in your project root.
+- db/db.sql should exist.
 
 -------------------------------------------------------------------------
 
@@ -41,26 +43,20 @@ EOF
 exit
 fi
 
+. craft-yaml-read
+
+
 # Prüfe db File
-if [ ! -e "${db_dump_file}" ]
-then
-    echo "${db_dump_file} nicht gefunden. "; echo "Abbruch"; echo
-    if [ "${override}" == "" ]; then exit; fi
+if [ ! -e "${db_dump_file}" ]; then
+  echo "${db_dump_file} not found. "; echo "Abort!!!"; echo
+  exit;
 fi
-
-if [ ! -e .siteconfig.yaml ]; then
-    "Kein .siteconfig.yaml File gefunden. "; echo "Abbruch"; echo
-    if [ "${override}" == "" ]; then exit; fi
-fi
-
-# read .siteconfig.yaml
-. yaml-read
 
 # Check DB vars
 if [ -z $stage_username ] || [ -z $stage_domain ] || [ -z $stage_db_host ] || [ -z $stage_db_name ] || [ -z $stage_db_user ] || [ -z $stage_db_pwd ]; then
-    cat << EOF
+  cat << EOF
 
-Es sind nicht alle nötigen Variabeln in .siteconfig.yaml definiert:
+It look like not all variables are defined in .siteconfig.yaml:
 
     stage_username: $stage_username
     stage_domain:   $stage_domain
@@ -69,28 +65,26 @@ Es sind nicht alle nötigen Variabeln in .siteconfig.yaml definiert:
     stage_db_user:  $stage_db_user
     stage_db_pwd:   $stage_db_pwd
 EOF
-    if [ "${override}" == "" ]; then exit; fi
+  exit;
 else
+  # Check backup directory
+  if [ ! -d ${db_backup_path} ]; then
+    mkdir ${db_backup_path}
+  fi
 
-    # Check backup directory
-    if [ ! -d ${db_backup_path} ]
-    then
-        mkdir ${db_backup_path}
-    fi
-
-    # Create backup filename
-    db_backup_date=$(date +"%Y-%m-%d_%H-%M-%S")
-    db_backup_filename="${stage_domain}-bk-${db_backup_date}.sql"
-    db_backup_filepath="${db_backup_path}${db_backup_filename}"
+  # Create backup filename
+  db_backup_date=$(date +"%Y-%m-%d_%H-%M-%S")
+  db_backup_filename="${stage_domain}-bk-${db_backup_date}.sql"
+  db_backup_filepath="${db_backup_path}${db_backup_filename}"
 
 cat << EOF
 
 =========================================================================
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-Datenbank "${stage_db_name}" auf "${stage_domain}" wird ÜBERSCHRIEBEN
+Database "${stage_db_name}" on "${stage_domain}" will be OVERRIDDEN
 
-Erstelle Backup in
+Create a Backup in
 "${db_backup_filepath}"
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -98,29 +92,22 @@ Erstelle Backup in
 
 EOF
 
-    if [ "${override}" == "" ]; then
-        read -p "Datenbank auf Server überschreiben? [y|N] " import_db
-    else
-        import_db="y";
-    fi
+  read -p "Override Database on STAGE? [y|N] " import_db
 
-    if [ "${import_db}" != 'y' ]; then
-        echo "Abbruch"; echo
-        if [ "${override}" == "" ]; then exit; fi
-    else
-        echo "Creating Backup in ${db_backup_filepath}"; echo
+  if [ "${import_db}" != 'y' ]; then
+    echo "Abort!!!"; echo
+    exit;
+  else
+    echo "Create Backup in ${db_backup_filepath}"; echo
 
-        bk_cmd="mysqldump -h ${stage_db_host} --user=${stage_db_user} --password=\"${stage_db_pwd}\" --opt --default-character-set=utf8 ${stage_db_name}"
-        (ssh ${stage_username}@${stage_domain} $bk_cmd) > ${db_backup_filepath}
+    bk_cmd="mysqldump -h ${stage_db_host} --user=${stage_db_user} --password=\"${stage_db_pwd}\" --opt --default-character-set=utf8 ${stage_db_name}"
+    (ssh ${stage_username}@${stage_domain} $bk_cmd) > ${db_backup_filepath}
 
 
-        echo "Importiere db.sql auf Stage-Site: $stage_domain"; echo
+    echo "Import db.sql on STAGE: $stage_domain"; echo
 
-        # Import DB-Dump into MySQL DB through SSH tunnel
-        # mysql -h ${db_host} -P 3307 --user=${db_user} --password="$db_password" --default-character-set=utf8 ${db_name} < db/${filename}
-        cmd="cat - | mysql -h ${stage_db_host} --user=${stage_db_user} --password=\"${stage_db_pwd}\" --default-character-set=utf8 ${stage_db_name}"
-        cat ${db_dump_file} | (ssh ${stage_username}@${stage_domain} $cmd)
-
-    fi
-
+    # Import DB-Dump into MySQL DB through SSH tunnel
+    cmd="cat - | mysql -h ${stage_db_host} --user=${stage_db_user} --password=\"${stage_db_pwd}\" --default-character-set=utf8 ${stage_db_name}"
+    cat ${db_dump_file} | (ssh ${stage_username}@${stage_domain} $cmd)
+  fi
 fi

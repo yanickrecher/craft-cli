@@ -1,0 +1,6 @@
+#!/bin/bash
+
+OUTPUT=$(cat .env | grep SECURITY_KEY)
+regex='"(.*)"'
+[[ $OUTPUT =~ $regex ]]
+echo ${BASH_REMATCH[1]};

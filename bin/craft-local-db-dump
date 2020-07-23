@@ -23,13 +23,13 @@ cat << EOF
 HELP
 -------------------------------------------------------------------------
 
-Erstellt einen DB-Dump aus der aktuellen Lokalen Nitro DB.
-Schreibt ein File mit Pfad db/db.sql
+Create a DB-Dump from your local nitro DB.
+Saves the dump in: db/db.sql
 
-Anforderungen:
-Du musst im Hauptverzeichnis eines Projekts sein, damit das klappt.
-Der Dump db/db.sql muss vorhanden sein.
-Nitro muss korrekt konfiguriert sein, da der Dump über nitro passiert.
+Requirements:
+- You have to be in your project root.
+- The Folder db/ has to be created.
+- Nitro needs to be properly configured.
 
 -------------------------------------------------------------------------
 
@@ -37,56 +37,91 @@ EOF
 exit
 fi
 
-# Prüfe, Verzeichnisse und Files
+. craft-yaml-read
+
+# check if the folder exists
 if [ ! -d db ]
 then
-    echo "Kann kein db/ Verzeichnis finden. "; echo "Abbruch"; echo ""
-    exit
+    echo "Can not find db/ folder in your projects root. "; echo "Abort!!!"; echo;
+    exit;
 fi
 
-
-# read .siteconfig.yaml
-. yaml-read
-
 # Check DB vars
-if [ -z $local_db_name ] || [ -z $local_db_user ] || [ -z $local_db_pwd ]; then
+if [ -z $local_db_name ] || [ -z $local_db_user ] || [ -z $local_db_pwd ] || [ -z $local_docker_container_name ]; then
     cat << EOF
 
-Es sind nicht alle nötigen Variabeln in .siteconfig.yaml definiert:
+It looks not all variables are defined in .siteconfig.yaml:
 
-    local_db_name:  $local_db_name
-    local_db_user:  $local_db_user
-    local_db_pwd:   $local_db_pwd
+    local_docker_container_name:  $local_docker_container_name
+    local_db_name:                $local_db_name
+    local_db_user:                $local_db_user
+    local_db_pwd:                 $local_db_pwd
 EOF
 exit
 fi
 
+echo "Start dump from local Database [$local_db_name]"; echo
 
-echo "DB dump aus lokaler DB…"; echo
-
-# Dump DB
-# mysqldump --user=${local_db_user} --host=localhost --password=${local_db_pwd} --opt --default-character-set=utf8 ${local_db_name} > db/db.sql
-OUTPUT=$(nitro db backup db/db.sql -m nitro-dev << EOF
+if [ -e ~/.nitro/nitro-dev.yaml ]; then
+  # create db dump with nitro
+OUTPUT=$(nitro db backup -m nitro-dev << EOF
 2
 EOF
 )
+  # Find the Database we realy want to backup
+  regex=".*([0-9]) - ${local_db_name}.*"
+  [[ $OUTPUT =~ $regex ]]
+  db_select=${BASH_REMATCH[1]};
 
-regex=".*([0-9]) - ${local_db_name}.*"
-[[ $OUTPUT =~ $regex ]]
-db_select=${BASH_REMATCH[1]};
-
+if [ "${db_select}" == "" ]; then
+  echo "Your db [$local_db_name] was not found in nitro. Abort!!!";echo
+  exit;
+fi
 
 OUTPUT=$(nitro db backup db/db.sql -m nitro-dev << EOF
 $db_select
 EOF
 )
 
-#echo "----${OUTPUT}";
-regex='.*stored in "(.*)"\.'
-[[ $OUTPUT =~ $regex ]]
-db_backup=${BASH_REMATCH[1]};
+  regex='.*stored in "(.*)"\.'
+  [[ $OUTPUT =~ $regex ]]
+  db_backup=${BASH_REMATCH[1]};
 
-rm db/db.sql
-cp $db_backup db/db.sql
+  if [ -e db/db.sql ]; then
+    rm db/db.sql
+  fi
+  cp $db_backup db/db.sql
+else
+  # if you are logged in in nitro, create db dump direct from docker
+  if [ -e db/db.sql ]; then
+    mv db/db.sql db/db_dump_temp.sql
+  fi
+  docker exec ${local_docker_container_name} /usr/bin/mysqldump -u${local_db_user} --password=${local_db_pwd} --opt --default-character-set=utf8 ${local_db_name} > db/db.sql
+  newDbContent=$(wc -c db/db.sql)
+  regex="([0-9]*).*"
+  [[ $newDbContent =~ $regex ]]
+  dbContentLength=${BASH_REMATCH[1]};
 
-echo "Dump in db/db.sql gespeichert"; echo
+  if [ "${dbContentLength}" == '0' ]; then
+    rm db/db.sql
+    if [ -e db/db_dump_temp.sql ]; then
+      mv db/db_dump_temp.sql db/db.sql
+    fi
+
+    echo "DB Dump was not successfully. Abort !!!"; echo
+    read -p "Do you want to see list of existing Databases (then you can check if your database is existing)? [y|N]: " showDatabases
+    if [ "$showDatabases" == 'y' ] || [ "$showDatabases" == 'Y' ]; then
+      echo "--------------Existing Databases-------------";
+      docker exec ${local_docker_container_name} /usr/bin/mysql -u${local_db_user} --password=${local_db_pwd} -e"show databases"
+      echo "---------------------------------------------";
+    fi
+    exit;
+  else
+    if [ -e db/db_dump_temp.sql ]; then
+      rm db/db_dump_temp.sql
+    fi
+  fi
+  # docker DB dump ------------------ end ----------------
+fi
+
+echo "Dump of [$local_db_name] successfully saved in your project as: db/db.sql"; echo

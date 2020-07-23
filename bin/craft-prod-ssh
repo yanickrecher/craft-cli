@@ -25,7 +25,7 @@ cat << EOF
 HELP
 -------------------------------------------------------------------------
 
-ssh auf den Prod-Webserver des aktuellen Projekts
+connect by ssh on your PROD-Webserver of the current project
 
 -------------------------------------------------------------------------
 
@@ -33,19 +33,14 @@ EOF
 exit
 fi
 
-if [ ! -e .siteconfig.yaml ]; then
-    "Kein .siteconfig.yaml File gefunden. "; echo "Abbruch"; echo
-    exit
-fi
-
 # read .siteconfig.yaml
-. yaml-read
+. craft-yaml-read
 
 # Check siteconfig vars
 if [ -z $prod_username ] || [ -z $prod_domain ] || [ -z $prod_path ]; then
     cat << EOF
 
-Es sind nicht alle nötigen Variabeln in .siteconfig.yaml definiert:
+It looks not all variables are defined in .siteconfig.yaml:
 
     prod_username: $prod_username
     prod_domain:   $prod_domain
@@ -55,6 +50,6 @@ exit
 fi
 
 # SSH auf den Server
-ssh -t ${prod_username}@${prod_domain} "cd ${prod_path} && cd .. ; bash"
+ssh -t ${prod_username}@${prod_domain} "cd ${prod_path} ; bash"
 
 

@@ -6,6 +6,7 @@
 help=""
 
 db_dump_file="db/db.sql"
+db_backup_path="${HOME}/db-backups/"
 
 # get options/arguments
 while getopts :h option
@@ -25,13 +26,13 @@ cat << EOF
 HELP
 -------------------------------------------------------------------------
 
-Importiert einen DB-Dump in die locale DB von Nitro
-Liest aus einem File mit Pfad db/db.sql
+Import a existing DB-Dump in your Nitro Database and override the existing DB.
+db/db.sql will be used as source.
 
-Anforderungen:
-Du musst im Hauptverzeichnis eines Projekts sein, damit das klappt.
-Das Verzeichnis db/ muss vorhanden sein.
-Nitro muss korrekt konfiguriert sein, da der Import über nitro passiert.
+Requirements:
+- You have to be in your project root.
+- db/db.sql should exist.
+- Nitro needs to be properly configured.
 
 -------------------------------------------------------------------------
 
@@ -39,54 +40,87 @@ EOF
 exit
 fi
 
-# Prüfe db File
+. craft-yaml-read
+
+# Check if the dump file exists
 if [ ! -e "${db_dump_file}" ]
 then
-    echo "${db_dump_file} nicht gefunden. "; echo "Abbruch"; echo
+    echo "Folder ${db_dump_file} not found. "; echo "Abort !!!"; echo
     exit
 fi
 
-# read .siteconfig.yaml
-. yaml-read
+# Check if backup folder exists
+if [ ! -d "${db_backup_path}" ]
+then
+    echo "Folder ${db_backup_path} not found. "; echo "Abort !!!"; echo
+    exit
+fi
 
 # Check DB vars
-if [ -z $local_db_host ] || [ -z $local_db_name ] || [ -z $local_db_user ] || [ -z $local_db_pwd ]; then
+if [ -z $local_db_name ] || [ -z $local_db_user ] || [ -z $local_db_pwd ] || [ -z $local_docker_container_name ]; then
     cat << EOF
 
-Es sind nicht alle nötigen Variabeln in .siteconfig.yaml definiert:
+It looks not all variables are defined in .siteconfig.yaml:
 
-    local_db_host:  $local_db_host
-    local_db_name:  $local_db_name
-    local_db_user:  $local_db_user
-    local_db_pwd:   $local_db_pwd
-
+    local_docker_container_name:  $local_docker_container_name
+    local_db_name:                $local_db_name
+    local_db_user:                $local_db_user
+    local_db_pwd:                 $local_db_pwd
 EOF
 exit
 fi
+
+# Create db backup name
+db_backup_date=$(date +"%Y-%m-%d_%H-%M-%S")
+db_backup_filename="${local_db_name}-bk-${db_backup_date}.sql"
+db_backup_filepath="${db_backup_path}${db_backup_filename}"
 
 cat << EOF
 
 =========================================================================
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-Datenbank wird local ÜBERSCHRIEBEN
+Local Database will be OVERWRITTEN
+
+Create Backup in:
+"${db_backup_filepath}"
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 =========================================================================
 
 EOF
 
-read -p "Datenbank in Nitro überschreiben? [y|N] " import_db
-if [ "${import_db}" != 'y' ]; then
-    echo "Abbruch"; echo
+read -p "You will overwrite your current DB in Nitro? [y|N] " acceptDbOverwrite
+if [ "${acceptDbOverwrite}" != 'y' ]; then
+    echo "Aborted !!!"; echo
     exit
 fi
 
-echo "Importiere db.sql in Nitro"; echo
 
+echo "Create backup of existing DB..."; echo
+if [ -e db/db.sql ]; then
+  mv db/db.sql db/db_import_temp.sql
+fi
 
-# Import DB (Shell-Command vorbereiten)
+. craft-local-db-dump
+
+if [ -e db/db.sql ]; then
+  mv db/db.sql $db_backup_filepath
+fi
+
+if [ -e db/db_import_temp.sql ]; then
+  mv db/db_import_temp.sql db/db.sql
+fi
+
+echo "Import db/db.sql in Nitro..."; echo
+
+if [ -e ~/.nitro/nitro-dev.yaml ]; then
 OUTPUT=$(nitro db import db/db.sql -m nitro-dev << EOF
 $local_db_name
 EOF
 )
+  echo $OUTPUT;
+else
+  cat db/db.sql | docker exec -i ${local_docker_container_name} /usr/bin/mysql -u${local_db_user} --password=${local_db_pwd} ${local_db_name}
+fi
+

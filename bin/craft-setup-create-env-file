@@ -32,6 +32,7 @@ cat << EOF
 HELP setup-create-env-file
 -------------------------------------------------------------------------
 
+Create the .env file for
 Erstellt die .env datei für Craft 3.
 Der Befehl erwartet ein Argument -e für Environtment
 erlaupte werte sind [local, stage, prod].
@@ -55,8 +56,7 @@ if [ -z "${env}" ]; then
     echo "Einer der folgenden Werte wird erwartet [local|stage|prod]";
 else
 
-    . yaml-read
-
+    . craft-yaml-read
 
 
     if [ -z "${craft_secure_key}" ]; then

@@ -27,11 +27,12 @@ cat << EOF
 HELP
 -------------------------------------------------------------------------
 
-Erstellt einen DB-Dump von einem Prod-Server
-Schreibt ein File mit Pfad db/db.sql
+Create a DB-Dump from your PROD Server.
+Saves the dump in: db/db.sql
 
-Du musst im Hauptverzeichnis eines Projekts sein, damit das klappt.
-Das Verzeichnis db/ muss vorhanden sein.
+Requirements:
+- You have to be in your project root.
+- the folder db/ should exist.
 
 -------------------------------------------------------------------------
 
@@ -39,26 +40,20 @@ EOF
 exit
 fi
 
-# Prüfe, Verzeichnisse und Files
+. craft-yaml-read
+
 if [ ! -d db ]
 then
     echo "Kann kein db/ Verzeichnis finden. "; echo "Abbruch"; echo
     exit
 fi
 
-if [ ! -e .siteconfig.yaml ]; then
-    "Kein .siteconfig.yaml File gefunden. "; echo "Abbruch"; echo
-    exit
-fi
-
-# read .siteconfig.yaml
-. yaml-read
 
 # Check DB vars
 if [ -z $prod_username ] || [ -z $prod_domain ] || [ -z $prod_db_host ] || [ -z $prod_db_name ] || [ -z $prod_db_user ] || [ -z $prod_db_pwd ]; then
     cat << EOF
 
-Es sind nicht alle nötigen Variabeln in .siteconfig.yaml definiert:
+It look like not all variables are defined in .siteconfig.yaml:
 
     prod_username: $prod_username
     prod_domain:   $prod_domain
@@ -71,7 +66,7 @@ exit
 fi
 
 
-echo "DB dump von Prod-Site: $prod_domain"; echo
+echo "Database dump from PROD Server: $prod_domain"; echo
 
 
 # Dump MySQL DB through SSH tunnel

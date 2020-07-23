@@ -1,0 +1,172 @@
+#!/bin/bash
+
+context_path=""
+remove=""
+
+# display help
+# -------------------------------------------------------------------------
+
+if [ "$1" == "help" ] || [ "$1" == "-h" ]; then
+
+cat << EOF
+
+-------------------------------------------------------------------------
+HELP sync-files
+-------------------------------------------------------------------------
+
+Sync your files which are saved in a specific namespace
+and sync it with your defined folder on STAGE.
+
+craft-stage-sync [namespace] [direction] [removeTarget]
+
+Params:
+[namespace]
+    volumes     sync your volumes folder
+
+    assets      sync your assets folder
+[direction]
+    down        (Default) Take the Filelist on STAGE as source and
+                copy the missing files to your LOCAL Environment
+
+    up          Take the Filelist from your Local Environment as source
+                and copy the missing files to your STAGE Environment
+
+[removeTarget]
+                remove all files on the target Environment which are
+                not in the Filelist of the source
+
+Examples
+--------
+craft-stage-sync volumes up
+
+Desc: Upload all missing files to stage
+
+--------
+craft-stage-sync volumes up remove
+
+Desc: Upload all missing files to stage and remove all Files on stage
+      which are not on LOCAL Environment
+
+-------------------------------------------------------------------------
+
+EOF
+exit
+fi
+
+. craft-yaml-read
+
+# Check siteconfig vars
+if [ -z $stage_username ] || [ -z $stage_domain ] || [ -z $stage_path ]; then
+  cat << EOF
+
+It look like not all variables are defined in .siteconfig.yaml:
+
+    stage_username: $stage_username
+    stage_domain:   $stage_domain
+    stage_path:     $stage_path
+EOF
+
+  if [ "$1" == "volumes" ] && [ -z "$volumes_path" ]; then
+    cat << EOF
+    volumes_path: $volumes_path
+EOF
+  fi
+
+  if [ "$1" == "assets" ] && [ -z "$assets_path" ]; then
+    cat << EOF
+      assets_path: $assets_path
+EOF
+  fi
+
+  exit;
+else
+
+  if [ "$1" == "volumes" ] && ! [ -z "$volumes_path" ]; then context_path=$volumes_path; fi
+  if [ "$1" == "assets" ] && ! [ -z "$assets_path" ]; then context_path=$assets_path; fi
+
+  if [ -z "$context_path" ]; then echo; echo "You need to define a namespace which should be synced. Abort!!!";  exit; fi
+
+  if [ "$2" == "up" ] || [ "$2" == "down" ]; then direction=$2; fi
+  if [ "$2" == "remove" ]; then remove="remove"; direction="down"; fi
+
+  if [ "$3" == "remove" ]; then remove="remove"; fi
+
+  rsync_local_path="${PWD}/${context_path}/"
+  rsync_stage_path="${stage_path}/${context_path}/"
+
+  # Confirm Command
+  # -------------------------------------------------------------------------
+
+  if [ "${direction}" == "down" ] || [ -z ${direction} ]; then
+    updown="Download"
+    echo
+    echo "DOWNLOAD volume files from STAGE -> LOCAL"
+    echo "---------------------------------------------------"
+    echo "SSH:          ${stage_username}@${stage_domain}"
+    echo "Path Local:   $rsync_local_path"
+    echo "Path Prod:    ${rsync_stage_path}"
+    if [ "${remove}" == "remove" ]; then
+      echo "!!delete extraneous files from LOCAL!!"
+    fi
+    echo
+  else
+    if [ "${direction}" == "up" ]; then
+      updown="Upload"
+      echo
+      echo "UPLOAD volume files from LOCAL -> STAGE"
+      echo "---------------------------------------------------"
+      echo "SSH:          ${stage_username}@${stage_domain}"
+      echo "Path Local:   $rsync_local_path"
+      echo "Path Prod:    ${rsync_stage_path}"
+      if [ "${remove}" == "remove" ]; then
+        echo "!!delete extraneous files from STAGE!!"
+      fi
+      echo
+    fi
+  fi
+
+  echo "${updown} execute?"
+  read -p "[y|N]: " do_rsync
+
+  if [ "${do_rsync}" != 'Y' ] && [ "${do_rsync}" != 'y' ]; then
+    echo; echo "Abort !!!"; echo
+    exit
+  fi
+
+  # Sync with rsynch
+  # -------------------------------------------------------------------------
+
+  # rsync [-options] source target
+  #
+  # --delete          delete extraneous files from dest dirs
+  # -a                archive mode; equals -rlptgoD (no -H,-A,-X)
+  # -v                increase verbosity
+  # -z                compress file data during the transfer
+  # -e ssh            specify the remote shell to use -> SSH
+
+  if [ "${direction}" == "down" ] || [ -z ${direction} ]; then
+
+    # Down
+    # ----
+
+    if [ "${remove}" == "remove" ]; then
+      rsync --delete -avze ssh ${stage_username}@${stage_domain}:${rsync_stage_path} $rsync_local_path
+    else
+      rsync -avze ssh ${stage_username}@${stage_domain}:${rsync_stage_path} $rsync_local_path
+    fi
+  else
+    if [ "${direction}" == "up" ]; then
+
+      # Up
+      # --
+
+      if [ "${remove}" == "remove" ]; then
+        rsync --delete -avze ssh ${rsync_local_path} ${stage_username}@${stage_domain}:${rsync_stage_path}
+      else
+        rsync -avze ssh ${rsync_local_path} ${stage_username}@${stage_domain}:${rsync_stage_path}
+      fi
+    else
+      echo "I don't know the Direction (-d ${direction})"; echo
+    fi
+  fi
+fi

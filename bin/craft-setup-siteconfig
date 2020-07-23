@@ -1,0 +1,432 @@
+#!/bin/bash
+
+
+
+# DEFAULTS
+# =========================================================================
+
+help=""
+
+date=$(date +"%Y-%m-%d")
+hash_in=${base_ip}${date}${secret_key}
+ip_hash=($(echo -n $hash_in | shasum -a 256))
+# ip_url="http://${ip_uri}?key=${ip_hash}&ip=${base_ip}&no_json=1"
+
+
+# sed escaping function
+# =========================================================================
+
+function sedescape {
+  sed -i '' "s/$(echo $1 | sed -e 's/\([[\/.*]\|\]\)/\\&/g')/$(echo $2 | sed -e 's/[\/&]/\\&/g')/g" $3
+}
+
+
+# get options/arguments
+while getopts p:h: option
+do
+    case "${option}"
+    in
+        h) help="help";;
+        c) currentpath_arg=${OPTARG};;
+    esac
+done
+
+cat << EOF
+
+=========================================================================
+Create .siteconfig.yaml
+=========================================================================
+
+EOF
+
+# display help
+
+if [[ "${help}" == "help" ]]; then
+cat << EOF
+
+-------------------------------------------------------------------------
+HELP
+-------------------------------------------------------------------------
+
+Creates the siteconfig.yaml with correct values.
+
+-------------------------------------------------------------------------
+
+EOF
+exit
+fi
+
+if [ -e ~/.nitro/nitro-dev.yaml ] ; then
+  echo "this command currently only works in the Nitro environment."
+  echo "Just run 'nitro ssh' go to your project folder in the Nitro environment,"
+  echo "and run this command from there."
+  echo "Abort!!!"
+  exit;
+fi
+
+if [ -f ".siteconfig.yaml" ]; then
+  echo "========================================================================"
+  echo ">>>>>>>>>>>>> ATTENTION YOU ALREADY HAVE A CONFIG FILE <<<<<<<<<<<<<<<<<"
+  echo "========================================================================"
+cat << EOF
+
+You can now do one of the follow things:
+    [s] first, show the content of the file
+    [r] rename
+    [d] delete
+
+EOF
+  existingSiteConfig=""
+  while [ "$existingSiteConfig" == "s" ] || [ "$existingSiteConfig" == "" ]
+  do
+    read -p "[s|R|d]: " existingSiteConfig
+
+    if [ -z $existingSiteConfig ] || [ "$existingSiteConfig" == "r" ]; then
+        mv .siteconfig.yaml .siteconfig_old.yaml
+        echo "the file is renamed to .siteconfig_old.yaml"; echo
+    fi
+
+    if [ "$existingSiteConfig" == "s" ]; then
+      cat .siteconfig.yaml
+    fi
+
+    if [ "$existingSiteConfig" == "d" ]; then
+      read -p "Are you shure you want remove the .siteconfig.yaml? [N|y]: " sureRemove
+      if [ $sureRemove == "y" ]; then
+        existingSiteConfig="d"
+      else
+        existingSiteConfig="r"
+      fi
+    fi
+  done
+fi
+
+# gibt denn aktuellen ordner zurück
+rootFolder=${PWD##*/}
+
+publicFolder="web"
+
+if ! [ -d web ]; then
+  if [ -d public ]; then
+    publicFolder="$rootFolder/public"
+  else
+    while [ ${#newPublicFolder} -lt "3" ]
+      do
+      read -p "How do you call your public folder? The Default is [$rootFolder/$publicFolder]: " newPublicFolder
+    done
+
+    publicFolder=$newPublicFolder;
+
+  fi
+fi
+
+assetsFolder=$publicFolder"/assets"
+while [ ${#newAssetsFolder} -lt "5" ]
+do
+  read -p "Where will your assets folder be? [$publicFolder/assets]: " newAssetsFolder
+  if [ -z "$newAssetsFolder" ]; then newAssetsFolder="$publicFolder/assets"; fi
+done
+assetsFolder=$newAssetsFolder
+
+
+echo "  The used Asset Folder is: $assetsFolder"; echo
+
+volumesFolder=$publicFolder"/volumes"
+while [ ${#newVolumesFolder} -lt "5" ]
+do
+  read -p "Your Volumes folder is by default in same folder like your assets are [$publicFolder/volumes]: " newVolumesFolder
+  if [ -z "$newVolumesFolder" ]; then newVolumesFolder="$publicFolder/volumes"; fi
+done
+volumesFolder=$newVolumesFolder;
+
+echo "  The used Volume Folder is: $volumesFolder"; echo
+
+cat << EOF
+
+Do you have settings for local Nitro Database?
+    [y] yes
+    [n] no
+
+EOF
+
+read -p "[Y|n]: " enter_local_data
+
+if [ -z "$enter_local_data" ] || [ "$enter_local_data" == "y" ]; then
+  if [ -e ~/.nitro/nitro-dev.yaml ]; then
+    echo "you are in your host environment";
+  else
+    dockerNameList=$(docker ps --format "{{.Names}}")
+    echo
+    echo "----- List of Docker Container -------"
+    echo $dockerNameList
+    echo "--------------------------------------"
+    local_docker_container_name=$(echo $dockerNameList | grep mysql)
+    read -p "Choose one of the list above or take the default[$local_docker_container_name] :" newLocalDockerContainerName
+
+    if ! [ -z "$newLocalDockerContainerName" ]; then
+      local_docker_container_name=$newLocalDockerContainerNames
+    fi
+
+    local_db_user="nitro"
+    local_db_pwd="nitro"
+    read -p "Database User (Default: nitro) [$local_db_user]: " new_local_db_user
+    read -p "Database Password (Default: nitro) [$local_db_pwd]: " new_local_db_pwd
+
+    if ! [ -z "$new_local_db_user" ]; then
+      local_db_user=$new_local_db_user
+    fi
+
+    if ! [ -z "$new_local_db_pwd" ]; then
+      local_db_pwd=$new_local_db_pwd
+    fi
+
+    while ! docker exec ${local_docker_container_name} /usr/bin/mysql -u${local_db_user} --password=${local_db_pwd} -e exit > /dev/null
+      do
+        echo
+        echo "Could not connect to your Database, check your settings: "
+        echo
+        dockerNameList=$(docker ps --format "{{.Names}}")
+        echo
+        echo "----- List of Docker Container -------"
+        echo $dockerNameList
+        echo "--------------------------------------"
+        local_docker_container_name=$(echo $dockerNameList | grep mysql)
+        read -p "Choose one of the list above or take the default[$local_docker_container_name] :" newLocalDockerContainerName
+
+        if ! [ -z "$newLocalDockerContainerName" ]; then
+          local_docker_container_name=$newLocalDockerContainerNames
+        fi
+
+        read -p "Database User (Default: nitro) [$local_db_user]: " new_local_db_user
+        read -p "Database Password (Default: nitro) [$local_db_pwd]: " new_local_db_pwd
+
+        if ! [ -z "$new_local_db_user" ]; then
+          local_db_user=$new_local_db_user
+        fi
+
+        if ! [ -z "$new_local_db_pwd" ]; then
+          local_db_pwd=$new_local_db_pwd
+        fi
+      done
+
+    goahead_db="";
+    while [ -z "$local_db_name" ] && [ ${#local_db_name} -lt "3" ] && [ -z "$goahead_db" ]
+    do
+      read -p "Database Name (min 3 chars): " local_db_name
+      if ! [ -z "$local_db_name" ]; then
+        localDBFound=$(docker exec ${local_docker_container_name} /usr/bin/mysql -u${local_db_user} --password=${local_db_pwd} -e"show databases" | grep $local_db_name)
+        if [ "$localDBFound" == "$local_db_name" ]; then
+          echo
+          echo "The Database ($local_db_name) was found";
+          goahead_db="go to next step"
+        else
+          echo
+          echo "The Database ($local_db_name) was not found!";
+          read -p "do you want to create the Database now? [Y|n]: " crateLocalDbNow
+
+          if [ -z "$crateLocalDbNow" ] || [ "$crateLocalDbNow" == "y" ]; then
+            docker exec ${local_docker_container_name} /usr/bin/mysql -u${local_db_user} --password=${local_db_pwd} -e"CREATE DATABASE ${local_db_name} CHARACTER SET utf8 COLLATE utf8_general_ci"
+            goahead_db="go to next step"
+          fi
+
+          if [ -z "$goahead_db" ]; then
+            read -p "do you want to skipp this step and creat the db by your own later? [Y|n]: " skipCreateDb
+            if [ -z "$skipCreateDb" ] || [ "$skipCreateDb" == "y" ]; then
+              goahead_db="go to next step"
+            fi
+          fi
+        fi
+      fi
+    done
+
+    echo
+    echo "Your Nitro settings was successfully tested";
+    echo
+  fi
+fi
+
+echo
+echo "-----------------------------------------------------------------------------"
+read -p "Do you have the settings for STAGE ready to enter [Y|n]: " enter_stage_data
+
+if [ -z "$enter_stage_data" ] || [ "$enter_stage_data" == 'y' ]; then
+    echo
+    echo "Stage-Server"
+    echo "-------------------------------------------------------------------------"
+    echo
+
+    stage_domain="yooapps.com"
+    read -p "Domain to the Hosting (for ssh) [yooapps.com]: " newStageDomain
+    if ! [ -z "$newStageDomain" ]; then
+      stage_domain=$newStageDomain;
+    fi
+
+    stage_path=""
+    while [ ${#stage_path} -lt "5" ]
+      do
+        read -p "The exact path to the root of the project [~/public_html/$rootFolder]: " stage_path
+        if [ -z "$stage_path" ]; then
+          stage_path="~/public_html/$rootFolder"
+        fi
+    done
+
+    read -p "Username (for ssh access)[yooappsc]: " newStageUsername
+
+    if [ -z "${newStageUsername}" ]; then
+      stage_username="yooappsc";
+    else
+      stage_username=$newStageUsername
+    fi
+
+    echo
+    echo "Stage Database"
+    echo "-------------------------------------------------------------------------"
+    echo
+
+    stage_db_name=""
+    while [ ${#stage_db_name} -lt "5" ]
+    do
+      read -p "Database Name (min 5 chars): " stage_db_name
+    done
+
+    stage_db_user=""
+    while [ ${#stage_db_user} -lt "5" ]
+    do
+      read -p "Database User (min 5 chars): " stage_db_user
+    done
+
+    while [ ${#stage_db_pwd} -lt "6" ]
+    do
+      read -p "Database Password (min 6 chars): " stage_db_pwd
+    done
+
+    # escape stage_db_pwd
+    stage_db_pwd="'${stage_db_pwd}'"
+
+    while [ ${#stage_db_host} -lt "5" ]
+    do
+      read -p "Host [127.0.0.1] : " stage_db_host
+      if [ -z $stage_db_host ]; then stage_db_host="127.0.0.1"; fi
+    done
+fi
+echo
+echo "-----------------------------------------------------------------------------"
+read -p "Do you have the settings for PROD ready to enter [Y|n]: " enter_prod_data
+
+# Prod-Server Angaben
+if [ -z "$enter_prod_data" ] || [ "$enter_prod_data" == 'y' ]; then
+    echo
+    echo "Prod-Server"
+    echo "-------------------------------------------------------------------------"
+    echo
+
+    prod_domain="yooapps.com"
+    read -p "Domain to the Hosting (for ssh) [yooapps.com]: " newProdDomain
+    if ! [ -z "$newProdDomain" ]; then
+      prod_domain=$newProdDomain;
+    fi
+
+    prod_path=""
+    while [ ${#prod_path} -lt "5" ]
+      do
+        read -p "The exact path to the root of the project (Example: ~/public_html/your-new-project): " prod_path
+    done
+
+    read -p "Username (for ssh access)[yooappsc]: " newProdUsername
+
+    if [ -z "${newProdUsername}" ]; then
+      prod_username="yooappsc";
+    else
+      prod_username=$newProdUsername
+    fi
+
+    echo
+    echo "Prod Database"
+    echo "-------------------------------------------------------------------------"
+    echo
+
+    prod_db_name=""
+    while [ ${#prod_db_name} -lt "5" ]
+    do
+      read -p "Database Name (min 5 chars): " prod_db_name
+    done
+
+    prod_db_user=""
+    while [ ${#prod_db_user} -lt "5" ]
+    do
+      read -p "Database User (min 5 chars): " prod_db_user
+    done
+
+    while [ ${#prod_db_pwd} -lt "6" ]
+    do
+      read -p "Database Password (min 6 chars): " prod_db_pwd
+    done
+
+    # escape prod_db_pwd
+    prod_db_pwd="'${prod_db_pwd}'"
+
+    while [ ${#prod_db_host} -lt "5" ]
+    do
+      read -p "Host [127.0.0.1] : " prod_db_host
+      if [ -z $prod_db_host ]; then prod_db_host="127.0.0.1"; fi
+    done
+fi
+
+. include-helpers
+
+security_key=$(. $helpers_path/get-security-key)
+
+if [ "$existingSiteConfig" == "d" ]; then
+  rm .siteconfig.yaml
+fi
+
+cat > .siteconfig.yaml << EOF
+# General
+public_path: ${publicFolder}
+assets_path: ${assetsFolder}
+volumes_path: ${volumesFolder}
+
+# Local
+craft_secure_key: ${security_key}
+
+# Local Database
+local_db_name: ${local_db_name}
+local_db_user: ${local_db_user}
+local_db_pwd: ${local_db_pwd}
+local_docker_container_name: ${local_docker_container_name}
+
+# Stage
+stage_domain: ${stage_domain}
+stage_username: ${stage_username}
+stage_path: ${stage_path}
+
+# Stage Database
+stage_db_host: ${stage_db_host}
+stage_db_name: ${stage_db_name}
+stage_db_user: ${stage_db_user}
+stage_db_pwd: ${stage_db_pwd}
+
+# Prod
+prod_domain: ${prod_domain}
+prod_username: ${prod_username}
+prod_path: ${prod_path}
+
+# Prod Database
+prod_db_host: ${prod_db_host}
+prod_db_name: ${prod_db_name}
+prod_db_user: ${prod_db_user}
+prod_db_pwd: ${prod_db_pwd}
+EOF
+
+echo
+echo
+cat .siteconfig.yaml
+echo "------------------------------------------------------"
+echo "Don't forget to save new created credentials in Keeper"
+echo "------------------------------------------------------"
+echo
+
+while ! [ -z $go_ahead ]
+do
+  read -p "Yes everything is saved [y|n]." go_ahead
+done
